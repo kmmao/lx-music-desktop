@@ -1,6 +1,14 @@
 import path from 'path'
 import music from '../../utils/music'
-import { getRandom, checkPath } from '../../utils'
+import {
+  getRandom,
+  checkPath,
+  getLyric as getStoreLyric,
+  setLyric,
+  setMusicUrl,
+  getMusicUrl as getStoreMusicUrl,
+  assertApiSupport,
+} from '../../utils'
 
 // state
 const state = {
@@ -17,9 +25,6 @@ const state = {
   tempPlayList: [],
 }
 
-let urlRequest
-// let picRequest
-// let lrcRequest
 
 const filterList = async({ playedList, listInfo, savePath, commit }) => {
   // if (this.list.listName === null) return
@@ -35,7 +40,7 @@ const filterList = async({ playedList, listInfo, savePath, commit }) => {
       canPlayList.push(item)
 
       // 排除已播放音乐
-      let index = filteredPlayedList.indexOf(item)
+      let index = filteredPlayedList.findIndex(m => (m.songmid || m.musicInfo.songmid) == item.musicInfo.songmid)
       if (index > -1) {
         filteredPlayedList.splice(index, 1)
         continue
@@ -47,7 +52,7 @@ const filterList = async({ playedList, listInfo, savePath, commit }) => {
       // if (!assertApiSupport(s.source)) return false
       canPlayList.push(s)
 
-      let index = filteredPlayedList.indexOf(s)
+      let index = filteredPlayedList.findIndex(m => (m.songmid || m.musicInfo.songmid) == s.songmid)
       if (index > -1) {
         filteredPlayedList.splice(index, 1)
         return false
@@ -62,12 +67,44 @@ const filterList = async({ playedList, listInfo, savePath, commit }) => {
   return list
 }
 
+const getMusicUrl = function(musicInfo, type, onToggleSource, retryedSource = [], originMusic) {
+  // console.log(musicInfo.source)
+  if (!originMusic) originMusic = musicInfo
+  let reqPromise
+  try {
+    reqPromise = music[musicInfo.source].getMusicUrl(musicInfo, type).promise
+  } catch (err) {
+    reqPromise = Promise.reject(err)
+  }
+  return reqPromise.catch(err => {
+    if (!retryedSource.includes(musicInfo.source)) retryedSource.push(musicInfo.source)
+    onToggleSource()
+    return this.dispatch('list/getOtherSource', originMusic).then(otherSource => {
+      console.log('find otherSource', otherSource)
+      if (otherSource.length) {
+        for (const item of otherSource) {
+          if (retryedSource.includes(item.source) || !assertApiSupport(item.source)) continue
+          console.log('try toggle to: ', item.source, item.name, item.singer, item.interval)
+          return getMusicUrl.call(this, item, type, onToggleSource, retryedSource, originMusic)
+        }
+      }
+      return Promise.reject(err)
+    })
+  })
+}
+
 const getPic = function(musicInfo, retryedSource = [], originMusic) {
   // console.log(musicInfo.source)
-  return music[musicInfo.source].getPic(musicInfo).promise.catch(err => {
+  if (!originMusic) originMusic = musicInfo
+  let reqPromise
+  try {
+    reqPromise = music[musicInfo.source].getPic(musicInfo).promise
+  } catch (err) {
+    reqPromise = Promise.reject(err)
+  }
+  return reqPromise.catch(err => {
     if (!retryedSource.includes(musicInfo.source)) retryedSource.push(musicInfo.source)
-    return this.dispatch('list/getOtherSource', musicInfo).then(otherSource => {
-      if (!originMusic) originMusic = musicInfo
+    return this.dispatch('list/getOtherSource', originMusic).then(otherSource => {
       console.log('find otherSource', otherSource)
       if (otherSource.length) {
         for (const item of otherSource) {
@@ -81,10 +118,16 @@ const getPic = function(musicInfo, retryedSource = [], originMusic) {
   })
 }
 const getLyric = function(musicInfo, retryedSource = [], originMusic) {
-  return music[musicInfo.source].getLyric(musicInfo).promise.catch(err => {
+  if (!originMusic) originMusic = musicInfo
+  let reqPromise
+  try {
+    reqPromise = music[musicInfo.source].getLyric(musicInfo).promise
+  } catch (err) {
+    reqPromise = Promise.reject(err)
+  }
+  return reqPromise.catch(err => {
     if (!retryedSource.includes(musicInfo.source)) retryedSource.push(musicInfo.source)
-    return this.dispatch('list/getOtherSource', musicInfo).then(otherSource => {
-      if (!originMusic) originMusic = musicInfo
+    return this.dispatch('list/getOtherSource', originMusic).then(otherSource => {
       console.log('find otherSource', otherSource)
       if (otherSource.length) {
         for (const item of otherSource) {
@@ -98,6 +141,7 @@ const getLyric = function(musicInfo, retryedSource = [], originMusic) {
   })
 }
 
+let prevListPlayIndex
 // getters
 const getters = {
   list: state => state.listInfo.list,
@@ -109,17 +153,31 @@ const getters = {
     const isTempPlay = !!state.playMusicInfo.isTempPlay
     const isPlayList = listId === playListId
     let playIndex = -1
-    let listPlayIndex = state.playIndex
+    let listPlayIndex = Math.min(state.playIndex, state.listInfo.list.length - 1)
 
     if (listId != '__temp__') {
+      const currentSongmid = state.playMusicInfo.musicInfo.songmid || state.playMusicInfo.musicInfo.musicInfo.songmid
       if (isPlayList) {
-        playIndex = state.listInfo.list.indexOf(state.playMusicInfo.musicInfo)
+        playIndex = state.listInfo.list.findIndex(m => (m.songmid || m.musicInfo.songmid) == currentSongmid)
         if (!isTempPlay) listPlayIndex = playIndex
+      } else if (listId == 'download') {
+        playIndex = window.downloadList.findIndex(m => m.musicInfo.songmid == currentSongmid)
       } else {
         let list = window.allList[listId]
-        if (list) playIndex = list.list.indexOf(state.playMusicInfo.musicInfo)
+        if (list) playIndex = list.list.findIndex(m => m.songmid == currentSongmid)
       }
     }
+    if (listPlayIndex >= 0) prevListPlayIndex = listPlayIndex
+    // if (listPlayIndex < 0) {
+    //   let length = state.listInfo.list.length
+    //   if (length) {
+    //     let index = Math.min(prevListPlayIndex, 0)
+    //     if (index > length - 1) index = length - 1
+    //     listPlayIndex = prevListPlayIndex = index
+    //   }
+    // } else {
+    //   prevListPlayIndex = listPlayIndex
+    // }
     // console.log({
     //   listId,
     //   playIndex,
@@ -127,7 +185,7 @@ const getters = {
     //   listPlayIndex,
     //   isPlayList,
     //   isTempPlay,
-    //   musicInfo: state.playMusicInfo.musicInfo,
+    //   // musicInfo: state.playMusicInfo.musicInfo,
     // })
     return {
       listId,
@@ -147,27 +205,20 @@ const getters = {
 
 // actions
 const actions = {
-  getUrl({ commit, state }, { musicInfo, originMusic, type, isRefresh }) {
-    if (!musicInfo._types[type]) {
-      // 兼容旧版酷我源搜索列表过滤128k音质的bug
-      if (!(musicInfo.source == 'kw' && type == '128k')) return Promise.reject(new Error('该歌曲没有可播放的音频'))
+  async getUrl({ commit, state }, { musicInfo, type, isRefresh, onToggleSource = () => {} }) {
+    // if (!musicInfo._types[type]) {
+    //   // 兼容旧版酷我源搜索列表过滤128k音质的bug
+    //   if (!(musicInfo.source == 'kw' && type == '128k')) throw new Error('该歌曲没有可播放的音频')
 
-      // return Promise.reject(new Error('该歌曲没有可播放的音频'))
-    }
-    if (urlRequest && urlRequest.cancelHttp) urlRequest.cancelHttp()
-    if (musicInfo.typeUrl[type] && !isRefresh) return Promise.resolve(musicInfo.typeUrl[type])
-    try {
-      urlRequest = music[musicInfo.source].getMusicUrl(musicInfo, type)
-    } catch (err) {
-      return Promise.reject(err)
-    }
-    return urlRequest.promise.then(({ url }) => {
-      if (originMusic) commit('setUrl', { musicInfo: originMusic, url, type })
+    //   // return Promise.reject(new Error('该歌曲没有可播放的音频'))
+    // }
+    const cachedUrl = await getStoreMusicUrl(musicInfo, type)
+    if (cachedUrl && !isRefresh) return cachedUrl
+
+    return getMusicUrl.call(this, musicInfo, type, onToggleSource).then(({ url }) => {
       commit('setUrl', { musicInfo, url, type })
-      urlRequest = null
       return url
     }).catch(err => {
-      urlRequest = null
       return Promise.reject(err)
     })
   },
@@ -182,26 +233,26 @@ const actions = {
       return Promise.reject(err)
     })
   },
-  getLrc({ commit, state }, musicInfo) {
+  async getLrc({ commit, state }, musicInfo) {
+    const lrcInfo = await getStoreLyric(musicInfo)
     // if (lrcRequest && lrcRequest.cancelHttp) lrcRequest.cancelHttp()
-    if (musicInfo.lrc && musicInfo.tlrc != null) {
-      if (musicInfo.lrc.startsWith('\ufeff[id:$00000000]')) {
-        let str = musicInfo.lrc.replace('\ufeff[id:$00000000]\n', '')
-        commit('setLrc', { musicInfo, lyric: str, tlyric: musicInfo.tlrc, lxlyric: musicInfo.tlrc })
-      } else if (musicInfo.lrc.startsWith('[id:$00000000]')) {
-        let str = musicInfo.lrc.replace('[id:$00000000]\n', '')
-        commit('setLrc', { musicInfo, lyric: str, tlyric: musicInfo.tlrc, lxlyric: musicInfo.tlrc })
-      }
+    if (lrcInfo.lyric && lrcInfo.tlyric != null) {
+      // if (musicInfo.lrc.startsWith('\ufeff[id:$00000000]')) {
+      //   let str = musicInfo.lrc.replace('\ufeff[id:$00000000]\n', '')
+      //   commit('setLrc', { musicInfo, lyric: str, tlyric: musicInfo.tlrc, lxlyric: musicInfo.tlrc })
+      // } else if (musicInfo.lrc.startsWith('[id:$00000000]')) {
+      //   let str = musicInfo.lrc.replace('[id:$00000000]\n', '')
+      //   commit('setLrc', { musicInfo, lyric: str, tlyric: musicInfo.tlrc, lxlyric: musicInfo.tlrc })
+      // }
 
-      if ((musicInfo.lxlrc == null && musicInfo.source != 'kg') || musicInfo.lxlrc != null) {
-        return Promise.resolve()
-      }
+      if ((lrcInfo.lxlyric == null && musicInfo.source != 'kg') || lrcInfo.lxlyric != null) return lrcInfo
     }
 
     // lrcRequest = music[musicInfo.source].getLyric(musicInfo)
     return getLyric.call(this, musicInfo).then(({ lyric, tlyric, lxlyric }) => {
       // lrcRequest = null
       commit('setLrc', { musicInfo, lyric, tlyric, lxlyric })
+      return { lyric, tlyric, lxlyric }
     }).catch(err => {
       // lrcRequest = null
       return Promise.reject(err)
@@ -211,12 +262,21 @@ const actions = {
   async playPrev({ state, rootState, commit, getters }) {
     const currentListId = state.listInfo.id
     const currentList = state.listInfo.list
+    const playInfo = getters.playInfo
     if (state.playedList.length) {
+      let currentSongmid
+      if (state.playMusicInfo.isTempPlay) {
+        const musicInfo = currentList[playInfo.listPlayIndex]
+        if (musicInfo) currentSongmid = musicInfo.songmid || musicInfo.musicInfo.songmid
+      } else {
+        currentSongmid = state.playMusicInfo.musicInfo.songmid || state.playMusicInfo.musicInfo.musicInfo.songmid
+      }
       // 从已播放列表移除播放列表已删除的歌曲
       let index
-      for (index = state.playedList.indexOf(state.playMusicInfo) - 1; index > -1; index--) {
+      for (index = state.playedList.findIndex(m => (m.musicInfo.songmid || m.musicInfo.musicInfo.songmid) === currentSongmid) - 1; index > -1; index--) {
         const playMusicInfo = state.playedList[index]
-        if (playMusicInfo.listId == currentListId && !currentList.includes(playMusicInfo.musicInfo)) {
+        const currentSongmid = playMusicInfo.musicInfo.songmid || playMusicInfo.musicInfo.musicInfo.songmid
+        if (playMusicInfo.listId == currentListId && !currentList.some(m => (m.songmid || m.musicInfo.songmid) === currentSongmid)) {
           commit('removePlayedList', index)
           continue
         }
@@ -236,9 +296,14 @@ const actions = {
       commit,
     })
     if (!filteredList.length) return commit('setPlayMusicInfo', null)
-    const playInfo = getters.playInfo
-    let currentIndex = filteredList.indexOf(currentList[playInfo.listPlayIndex])
-    if (currentIndex == -1) currentIndex = 0
+
+    let listPlayIndex = playInfo.listPlayIndex
+    const currentListLength = state.listInfo.list.length - 1
+    if (listPlayIndex == -1 && currentListLength) {
+      listPlayIndex = prevListPlayIndex >= currentListLength ? 0 : prevListPlayIndex + 1
+    }
+    let currentIndex = listPlayIndex
+    if (currentIndex < 0) currentIndex = 0
     let nextIndex = currentIndex
     if (!playInfo.isTempPlay) {
       switch (rootState.setting.player.togglePlayMethod) {
@@ -272,12 +337,22 @@ const actions = {
     }
     const currentListId = state.listInfo.id
     const currentList = state.listInfo.list
+    const playInfo = getters.playInfo
+
     if (state.playedList.length) {
+      let currentSongmid
+      if (state.playMusicInfo.isTempPlay) {
+        const musicInfo = currentList[playInfo.listPlayIndex]
+        if (musicInfo) currentSongmid = musicInfo.songmid || musicInfo.musicInfo.songmid
+      } else {
+        currentSongmid = state.playMusicInfo.musicInfo.songmid || state.playMusicInfo.musicInfo.musicInfo.songmid
+      }
       // 从已播放列表移除播放列表已删除的歌曲
       let index
-      for (index = state.playedList.indexOf(state.playMusicInfo) + 1; index < state.playedList.length; index++) {
+      for (index = state.playedList.findIndex(m => (m.musicInfo.songmid || m.musicInfo.musicInfo.songmid) === currentSongmid) + 1; index < state.playedList.length; index++) {
         const playMusicInfo = state.playedList[index]
-        if (playMusicInfo.listId == currentListId && !currentList.includes(playMusicInfo.musicInfo)) {
+        const currentSongmid = playMusicInfo.musicInfo.songmid || playMusicInfo.musicInfo.musicInfo.songmid
+        if (playMusicInfo.listId == currentListId && !currentList.some(m => (m.songmid || m.musicInfo.songmid) === currentSongmid)) {
           commit('removePlayedList', index)
           continue
         }
@@ -297,9 +372,14 @@ const actions = {
     })
 
     if (!filteredList.length) return commit('setPlayMusicInfo', null)
-    const playInfo = getters.playInfo
-    const currentIndex = filteredList.indexOf(currentList[playInfo.listPlayIndex])
+    let listPlayIndex = playInfo.listPlayIndex
+    const currentListLength = state.listInfo.list.length - 1
+    if (listPlayIndex == -1 && currentListLength) {
+      listPlayIndex = prevListPlayIndex > currentListLength ? currentListLength : prevListPlayIndex - 1
+    }
+    const currentIndex = listPlayIndex
     let nextIndex = currentIndex
+
     switch (rootState.setting.player.togglePlayMethod) {
       case 'listLoop':
         nextIndex = currentIndex === filteredList.length - 1 ? 0 : currentIndex + 1
@@ -328,18 +408,24 @@ const actions = {
 
 // mitations
 const mutations = {
-  setUrl(state, datas) {
-    datas.musicInfo.typeUrl = Object.assign({}, datas.musicInfo.typeUrl, { [datas.type]: datas.url })
+  setUrl(state, { musicInfo, type, url }) {
+    setMusicUrl(musicInfo, type, url)
   },
   getPic(state, datas) {
     datas.musicInfo.img = datas.url
   },
   setLrc(state, datas) {
-    datas.musicInfo.lrc = datas.lyric
-    datas.musicInfo.tlrc = datas.tlyric
-    datas.musicInfo.lxlrc = datas.lxlyric
+    // datas.musicInfo.lrc = datas.lyric
+    // datas.musicInfo.tlrc = datas.tlyric
+    // datas.musicInfo.lxlrc = datas.lxlyric
+    setLyric(datas.musicInfo, {
+      lyric: datas.lyric,
+      tlyric: datas.tlyric,
+      lxlyric: datas.lxlyric,
+    })
   },
   setList(state, { list, index }) {
+    if (!(list && list.list && list.list[index])) return
     state.playMusicInfo = {
       musicInfo: list.list[index],
       listId: list.id,
@@ -391,7 +477,10 @@ const mutations = {
       playIndex = -1
     } else {
       let listId = playMusicInfo.listId
-      if (listId != '__temp__' && listId === state.listInfo.id) playIndex = state.listInfo.list.indexOf(state.playMusicInfo.musicInfo)
+      if (listId != '__temp__' && !playMusicInfo.isTempPlay && listId === state.listInfo.id) {
+        const currentSongmid = playMusicInfo.musicInfo.songmid || playMusicInfo.musicInfo.musicInfo.songmid
+        playIndex = state.listInfo.list.findIndex(m => (m.songmid || m.musicInfo.songmid) == currentSongmid)
+      }
     }
 
     state.playMusicInfo = playMusicInfo

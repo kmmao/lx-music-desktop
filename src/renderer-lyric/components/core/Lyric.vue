@@ -21,6 +21,7 @@ export default {
       default() {
         return {
           style: {
+            font: '',
             fontSize: 125,
             opacity: 80,
             isZoomActiveLrc: true,
@@ -32,7 +33,7 @@ export default {
       type: Boolean,
       default: true,
     },
-    isShowLyricTransition: {
+    isShowLyricTranslation: {
       type: Boolean,
       default: true,
     },
@@ -77,6 +78,7 @@ export default {
   computed: {
     lrcStyles() {
       return {
+        fontFamily: this.lrcConfig.style.font,
         fontSize: this.lrcConfig.style.fontSize / 100 + 'rem',
         opacity: this.lrcConfig.style.opacity / 100,
       }
@@ -126,7 +128,7 @@ export default {
       },
       immediate: true,
     },
-    isShowLyricTransition() {
+    isShowLyricTranslation() {
       this.setLyric()
       rendererSend(NAMES.winLyric.get_lyric_info, 'status')
     },
@@ -306,8 +308,8 @@ export default {
     setLyric() {
       window.lrc.setLyric(
         this.isPlayLxlrc && this.lyrics.lxlyric ? this.lyrics.lxlyric : this.lyrics.lyric,
-        this.isShowLyricTransition && this.lyrics.tlyric ? this.lyrics.tlyric : '',
-        // (this.isShowLyricTransition && this.lyrics.tlyric ? (this.lyrics.tlyric + '\n') : '') + (this.lyrics.lyric || ''),
+        this.isShowLyricTranslation && this.lyrics.tlyric ? this.lyrics.tlyric : '',
+        // (this.isShowLyricTranslation && this.lyrics.tlyric ? (this.lyrics.tlyric + '\n') : '') + (this.lyrics.lyric || ''),
       )
     },
   },

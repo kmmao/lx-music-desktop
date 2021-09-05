@@ -47,8 +47,16 @@ exports.createWindow = async userApi => {
     show: false,
     webPreferences: {
       contextIsolation: true,
-      worldSafeExecuteJavaScript: true,
+      // worldSafeExecuteJavaScript: true,
       nodeIntegration: false,
+
+      spellcheck: false,
+      autoplayPolicy: 'document-user-activation-required',
+      enableWebSQL: false,
+      disableDialogs: true,
+      webgl: false,
+      images: false,
+
       preload: path.join(dir, 'renderer/preload.js'),
     },
   })
@@ -59,6 +67,7 @@ exports.createWindow = async userApi => {
     })
   }
   global.modules.userApiWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    // eslint-disable-next-line node/no-callback-literal
     callback(false)
   })
 

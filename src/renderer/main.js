@@ -23,9 +23,10 @@ import { rendererSend, NAMES } from '../common/ipc'
 sync(store, router)
 
 Vue.config.productionTip = false
-
+Vue.config.devtools = process.env.NODE_ENV === 'development'
 
 getSetting().then(({ setting, version }) => {
+  global.appSetting = setting
   // Set language automatically
   if (!window.i18n.availableLocales.includes(setting.langId)) {
     let langId = null
@@ -56,5 +57,7 @@ getSetting().then(({ setting, version }) => {
     el: '#root',
     render: h => h(App),
   })
+
+  // window.__VUE_DEVTOOLS_GLOBAL_HOOK__.Vue = app.constructor
 })
 

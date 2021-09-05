@@ -1,7 +1,7 @@
 import Vue from 'vue'
 import keyBind from '../utils/keyBind'
 import { rendererOn, rendererSend, NAMES, rendererInvoke } from '../../common/ipc'
-import { base as baseName } from './names'
+import { base as baseName, sync as syncName } from './names'
 import { common as hotKeyNamesCommon } from '../../common/hotKey'
 
 const eventHub = window.eventHub = new Vue()
@@ -25,6 +25,14 @@ eventHub.$on(baseName.bindKey, () => {
     // console.log(event, key)
     if (!window.isEditingHotKey && appHotKeyConfig.local.enable && appHotKeyConfig.local.keys[key]) {
       if (type == 'up') return
+
+      // 软件内快捷键的最小化触发时
+      // 如果已启用托盘，则隐藏程序，否则最小化程序 https://github.com/lyswhut/lx-music-desktop/issues/603
+      if (appHotKeyConfig.local.keys[key].action == hotKeyNamesCommon.min.action && global.appSetting.tray.isToTray) {
+        eventHub.$emit(hotKeyNamesCommon.hide_toggle.action)
+        return
+      }
+
       eventHub.$emit(appHotKeyConfig.local.keys[key].action)
       return
     }
@@ -76,4 +84,19 @@ rendererOn(NAMES.mainWindow.set_hot_key_config, (event, config) => {
     window.appHotKeyConfig[type] = config[type]
   }
   window.eventHub.$emit(baseName.set_hot_key_config, config)
+})
+
+rendererOn(NAMES.mainWindow.sync_action_list, (event, { action, data }) => {
+  window.eventHub.$emit(syncName.handle_action_list, { action, data })
+})
+eventHub.$on(syncName.send_action_list, ({ action, data }) => {
+  if (!window.globalObj.sync.enable) return
+  rendererSend(NAMES.mainWindow.sync_action_list, { action, data })
+})
+rendererOn(NAMES.mainWindow.sync_list, (event, { action, data }) => {
+  window.eventHub.$emit(syncName.handle_sync_list, { action, data })
+})
+eventHub.$on(syncName.send_sync_list, ({ action, data }) => {
+  if (!window.globalObj.sync.enable) return
+  rendererSend(NAMES.mainWindow.sync_list, { action, data })
 })

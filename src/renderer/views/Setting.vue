@@ -63,34 +63,38 @@ div(:class="$style.main")
           material-checkbox(v-for="item in controlBtnPositionList" :key="item.id" :class="$style.gapLeft" :id="`setting_basic_control_btn_position_${item.id}`"
             name="setting_basic_control_btn_position" need v-model="current_setting.controlBtnPosition" :value="item.id" :label="item.name")
 
-    dt#play {{$t('view.setting.play')}}
-    dd
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_player_save_play_time" v-model="current_setting.player.isSavePlayTime" :label="$t('view.setting.play_save_play_time')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_player_lyric_transition" v-model="current_setting.player.isShowLyricTransition" :label="$t('view.setting.play_lyric_transition')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_player_lyric_play_lxlrc" v-model="current_setting.player.isPlayLxlrc" :label="$t('view.setting.play_lyric_lxlrc')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_player_highQuality" v-model="current_setting.player.highQuality" :label="$t('view.setting.play_quality')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_player_showTaskProgess" v-model="current_setting.player.isShowTaskProgess" :label="$t('view.setting.play_task_bar')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_player_isMediaDeviceRemovedStopPlay" v-model="current_setting.player.isMediaDeviceRemovedStopPlay" :label="$t('view.setting.play_mediaDevice_remove_stop_play')")
-    dd(:tips="$t('view.setting.play_mediaDevice_title')")
-      h3#play_mediaDevice {{$t('view.setting.play_mediaDevice')}}
-      div
-        material-selection(:list="mediaDevices" :class="$style.gapLeft" v-model="current_setting.player.mediaDeviceId" item-key="deviceId" item-name="label")
-    dt#desktop_lyric {{$t('view.setting.desktop_lyric')}}
-    dd
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_desktop_lyric_enable" v-model="current_setting.desktopLyric.enable" :label="$t('view.setting.desktop_lyric_enable')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_desktop_lyric_lock" v-model="current_setting.desktopLyric.isLock" :label="$t('view.setting.desktop_lyric_lock')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_desktop_lyric_alwaysOnTop" v-model="current_setting.desktopLyric.isAlwaysOnTop" :label="$t('view.setting.desktop_lyric_always_on_top')")
-      div(:class="$style.gapTop")
-        material-checkbox(id="setting_desktop_lyric_lockScreen" v-model="current_setting.desktopLyric.isLockScreen" :label="$t('view.setting.desktop_lyric_lock_screen')")
+      dt#play {{$t('view.setting.play')}}
+      dd
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_player_save_play_time" v-model="current_setting.player.isSavePlayTime" :label="$t('view.setting.play_save_play_time')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_player_lyric_transition" v-model="current_setting.player.isShowLyricTranslation" :label="$t('view.setting.play_lyric_transition')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_player_lyric_play_lxlrc" v-model="current_setting.player.isPlayLxlrc" :label="$t('view.setting.play_lyric_lxlrc')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_player_highQuality" v-model="current_setting.player.highQuality" :label="$t('view.setting.play_quality')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_player_showTaskProgess" v-model="current_setting.player.isShowTaskProgess" :label="$t('view.setting.play_task_bar')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_player_isMediaDeviceRemovedStopPlay" v-model="current_setting.player.isMediaDeviceRemovedStopPlay" :label="$t('view.setting.play_mediaDevice_remove_stop_play')")
+      dd(:tips="$t('view.setting.play_mediaDevice_title')")
+        h3#play_mediaDevice {{$t('view.setting.play_mediaDevice')}}
+        div
+          material-selection(:list="mediaDevices" :class="$style.gapLeft" v-model="current_setting.player.mediaDeviceId" item-key="deviceId" item-name="label")
+      dt#desktop_lyric {{$t('view.setting.desktop_lyric')}}
+      dd
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_desktop_lyric_enable" v-model="current_setting.desktopLyric.enable" :label="$t('view.setting.desktop_lyric_enable')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_desktop_lyric_lock" v-model="current_setting.desktopLyric.isLock" :label="$t('view.setting.desktop_lyric_lock')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_desktop_lyric_alwaysOnTop" v-model="current_setting.desktopLyric.isAlwaysOnTop" :label="$t('view.setting.desktop_lyric_always_on_top')")
+        div(:class="$style.gapTop")
+          material-checkbox(id="setting_desktop_lyric_lockScreen" v-model="current_setting.desktopLyric.isLockScreen" :label="$t('view.setting.desktop_lyric_lock_screen')")
+      dd
+        h3#desktop_lyric_font {{$t('view.setting.desktop_lyric_font')}}
+        div
+          material-selection(:list="fontList" :class="$style.gapLeft" v-model="current_setting.desktopLyric.style.font" item-key="id" item-name="label")
 
       dt#search {{$t('view.setting.search')}}
       dd
@@ -107,6 +111,13 @@ div(:class="$style.main")
           material-checkbox(id="setting_list_showSource_enable" v-model="current_setting.list.isShowSource" :label="$t('view.setting.list_source')")
         div(:class="$style.gapTop")
           material-checkbox(id="setting_list_scroll_enable" v-model="current_setting.list.isSaveScrollLocation" :label="$t('view.setting.list_scroll')")
+      dd(:tips="$t('view.setting.basic_sourcename_title')")
+        h3#list_addMusicLocationType {{$t('view.setting.list_add_music_location_type')}}
+        div
+          material-checkbox(:class="$style.gapLeft" id="setting_list_add_music_location_type_top"
+            name="setting_list_add_music_location_type" need v-model="current_setting.list.addMusicLocationType" value="top" :label="$t('view.setting.list_add_music_location_type_top')")
+          material-checkbox(:class="$style.gapLeft" id="setting_list_add_music_location_type_bottom"
+            name="setting_list_add_music_location_type" need v-model="current_setting.list.addMusicLocationType" value="bottom" :label="$t('view.setting.list_add_music_location_type_bottom')")
       //- dd(:tips="播放列表是否显示专辑栏")
         h3 专辑栏
         div
@@ -122,6 +133,11 @@ div(:class="$style.main")
             span.auto-hidden.hover(:tips="$t('view.setting.download_path_open_label')" :class="$style.savePath" @click="handleOpenDir(current_setting.download.savePath)") {{current_setting.download.savePath}}
           p
             material-btn(:class="$style.btn" min @click="handleChangeSavePath") {{$t('view.setting.download_path_change_btn')}}
+      dd
+        h3#download_use_other_source {{$t('view.setting.download_use_other_source')}}
+        div
+          material-checkbox(id="setting_download_isUseOtherSource" v-model="current_setting.download.isUseOtherSource" :label="$t('view.setting.is_enable')")
+        div
       dd(:tips="$t('view.setting.download_name_title')")
         h3#download_name {{$t('view.setting.download_name')}}
         div
@@ -137,6 +153,26 @@ div(:class="$style.main")
         h3#download_lyric {{$t('view.setting.download_lyric')}}
         div
           material-checkbox(id="setting_download_isDownloadLrc" v-model="current_setting.download.isDownloadLrc" :label="$t('view.setting.is_enable')")
+      dd
+        h3#download_lyric {{$t('view.setting.download_lyric_format')}}
+        div
+          material-checkbox(v-for="item in lrcFormatList" :key="item.id" :class="$style.gapLeft" :id="`setting_download_lrcFormat_${item.id}`"
+            name="setting_basic_control_btn_position" need v-model="current_setting.download.lrcFormat" :value="item.id" :label="item.name")
+
+      dt#sync {{$t('view.setting.sync')}}
+      dd
+        material-checkbox(id="setting_sync_enable" v-model="current_setting.sync.enable" @change="handleSyncChange('enable')" :label="syncEnableTitle")
+        div
+          p.small {{$t('view.setting.sync_auth_code', { code: sync.status.code || '' })}}
+          p.small {{$t('view.setting.sync_address', { address: sync.status.address.join(', ') || '' })}}
+          p.small {{$t('view.setting.sync_device', { devices: syncDevices })}}
+          p
+            material-btn(:class="$style.btn" min :disabled="!sync.status.status" @click="handleRefreshSyncCode") {{$t('view.setting.sync_refresh_code')}}
+      dd
+        h3#sync_port {{$t('view.setting.sync_port')}}
+        div
+          p
+            material-input(:class="$style.gapLeft" v-model.trim="current_setting.sync.port" @change="handleSyncChange('port')" :placeholder="$t('view.setting.sync_port_tip')")
 
       dt#hot_key {{$t('view.setting.hot_key')}}
       dd
@@ -169,11 +205,11 @@ div(:class="$style.main")
           p
             material-checkbox(id="setting_network_proxy_enable" v-model="current_setting.network.proxy.enable" @change="handleProxyChange('enable')" :label="$t('view.setting.is_enable')")
           p
-            material-input(:class="$style.gapLeft" v-model="current_setting.network.proxy.host" @change="handleProxyChange('host')" :placeholder="$t('view.setting.network_proxy_host')")
-            material-input(:class="$style.gapLeft" v-model="current_setting.network.proxy.port" @change="handleProxyChange('port')" :placeholder="$t('view.setting.network_proxy_port')")
+            material-input(:class="$style.gapLeft" v-model.trim="current_setting.network.proxy.host" @change="handleProxyChange('host')" :placeholder="$t('view.setting.network_proxy_host')")
+            material-input(:class="$style.gapLeft" v-model.trim="current_setting.network.proxy.port" @change="handleProxyChange('port')" :placeholder="$t('view.setting.network_proxy_port')")
           p
-            material-input(:class="$style.gapLeft" v-model="current_setting.network.proxy.username" @change="handleProxyChange('username')" :placeholder="$t('view.setting.network_proxy_username')")
-            material-input(:class="$style.gapLeft" v-model="current_setting.network.proxy.password" @change="handleProxyChange('password')" type="password" :placeholder="$t('view.setting.network_proxy_password')")
+            material-input(:class="$style.gapLeft" v-model.trim="current_setting.network.proxy.username" @change="handleProxyChange('username')" :placeholder="$t('view.setting.network_proxy_username')")
+            material-input(:class="$style.gapLeft" v-model.trim="current_setting.network.proxy.password" @change="handleProxyChange('password')" type="password" :placeholder="$t('view.setting.network_proxy_password')")
       dt#odc {{$t('view.setting.odc')}}
       dd
         div(:class="$style.gapTop")
@@ -232,13 +268,15 @@ div(:class="$style.main")
           span.hover.underline(:tips="$t('view.setting.click_open')" @click="handleOpenUrl('https://github.com/lyswhut/lx-music-desktop#readme')") https://github.com/lyswhut/lx-music-desktop
         p.small
           | 最新版网盘下载地址（网盘内有Windows、MAC版）：
-          span.hover.underline(:tips="$t('view.setting.click_open')" @click="handleOpenUrl('https://www.lanzoux.com/b0bf2cfa/')") 网盘地址
+          span.hover.underline(:tips="$t('view.setting.click_open')" @click="handleOpenUrl('https://www.lanzoui.com/b0bf2cfa/')") 网盘地址
           | &nbsp;&nbsp;密码：
           span.hover(:tips="$t('view.setting.click_copy')" @click="clipboardWriteText('glqw')") glqw
         p.small
           | 软件的常见问题可转至：
           span.hover.underline(:tips="$t('view.setting.click_open')" @click="handleOpenUrl('https://github.com/lyswhut/lx-music-desktop/blob/master/FAQ.md')") 常见问题
         p.small
+          strong 本软件没有客服
+          | ，但我们整理了一些常见的使用问题，
           strong 仔细 仔细 仔细
           | 地阅读常见问题后，
         p.small
@@ -250,7 +288,17 @@ div(:class="$style.main")
           span.hover.underline(:tips="$t('view.setting.click_open')" @click="handleOpenUrl('https://github.com/lyswhut/lx-music-desktop/issues')") issue
 
         br
-        p.small 感谢以前捐赠过的人❤️，现在软件不再接受捐赠，建议把你们的爱心用来支持正版音乐，
+        p.small
+          | 如果你喜欢并经常使用洛雪音乐，并想要第一时间尝鲜洛雪的新功能&nbsp;
+          span(style="text-decoration: line-through;") （当小白鼠）
+          | ，
+        p
+          | 可以加入测试企鹅群&nbsp;
+          span.hover(:tips="$t('view.setting.click_open')" @click="handleOpenUrl('https://qm.qq.com/cgi-bin/qm/qr?k=zR6aYosQoKb07g4FGFZdO9n9zL1dhFpE&jump_from=webapi')") 768786588
+          | &nbsp;，注意：测试版的功可能会不稳定，
+          strong 打算潜水的勿加
+
+        br
         p.small 由于软件开发的初衷仅是为了对新技术的学习与研究，因此软件直至停止维护都将会一直保持纯净。
 
         p.small
@@ -279,8 +327,10 @@ import {
   clearCache,
   sizeFormate,
   setWindowSize,
+  getSetting,
+  saveSetting,
 } from '../utils'
-import { rendererSend, rendererInvoke, NAMES } from '@common/ipc'
+import { rendererSend, rendererInvoke, rendererOn, NAMES, rendererOff } from '@common/ipc'
 import { mergeSetting, isMac } from '../../common/utils'
 import apiSourceInfo from '../utils/music/api-source-info'
 import fs from 'fs'
@@ -289,6 +339,7 @@ import { base as eventBaseName } from '../event/names'
 import * as hotKeys from '../../common/hotKey'
 import { mainWindow as eventsNameMainWindow, winLyric as eventsNameWinLyric } from '../../main/events/_name'
 import { gzip, gunzip } from 'zlib'
+import music from '../utils/music'
 
 let hotKeyTargetInput
 let newHotKey
@@ -382,6 +433,18 @@ export default {
         },
       ]
     },
+    lrcFormatList() {
+      return [
+        {
+          name: this.$t('view.setting.download_lyric_format_utf8'),
+          id: 'utf8',
+        },
+        {
+          name: this.$t('view.setting.download_lyric_format_gbk'),
+          id: 'gbk',
+        },
+      ]
+    },
     trayThemeList() {
       return [
         {
@@ -393,6 +456,24 @@ export default {
           name: 'origin',
         },
       ]
+    },
+    syncEnableTitle() {
+      let title = this.$t('view.setting.sync_enable')
+      if (this.sync.status.message) {
+        title += ` [${this.sync.status.message}]`
+      }
+      // else if (this.sync.status.address.length) {
+      //   // title += ` [${this.sync.status.address.join(', ')}]`
+      // }
+      return title
+    },
+    syncDevices() {
+      return this.sync.status.devices.length
+        ? this.sync.status.devices.map(d => `${d.deviceName} (${d.clientId.substring(0, 5)})`).join(', ')
+        : ''
+    },
+    fontList() {
+      return [{ id: '', label: this.$t('view.setting.desktop_lyric_font_default') }, ...this.systemFontList]
     },
   },
   data() {
@@ -415,6 +496,7 @@ export default {
           y: -1,
           theme: '',
           style: {
+            font: '',
             fontSize: 125,
             opacity: 80,
             isZoomActiveLrc: true,
@@ -437,6 +519,7 @@ export default {
           savePath: '',
           fileName: '歌名 - 歌手',
           isDownloadLrc: false,
+          lrcFormat: 'utf8',
           isEmbedPic: true,
           isEmbedLyric: true,
         },
@@ -457,6 +540,10 @@ export default {
           isShow: false,
           isToTray: false,
           themeId: 0,
+        },
+        sync: {
+          enable: false,
+          port: '23332',
         },
         windowSizeId: 1,
         langId: 'cns',
@@ -592,6 +679,16 @@ export default {
       },
       isDisabledResourceCacheClear: false,
       isDisabledListCacheClear: false,
+      sync: {
+        status: {
+          status: false,
+          message: '',
+          address: [],
+          code: '',
+          devices: [],
+        },
+      },
+      systemFontList: [],
     }
   },
   watch: {
@@ -649,6 +746,9 @@ export default {
     window.eventHub.$off(eventBaseName.set_config, this.handleUpdateSetting)
     window.eventHub.$off(eventBaseName.key_down, this.handleKeyDown)
     window.eventHub.$off(eventBaseName.set_hot_key_config, this.handleUpdateHotKeyConfig)
+    this.syncUnInit()
+
+    if (this.current_setting.network.proxy.enable && !this.current_setting.network.proxy.host) window.globalObj.proxy.enable = false
   },
   methods: {
     ...mapMutations(['setSetting', 'setSettingVersion', 'setVersionModalVisible']),
@@ -662,10 +762,12 @@ export default {
       if (!window.currentWindowSizeId) window.currentWindowSizeId = this.setting.windowSizeId
       // this.initTOC()
       this.getCacheSize()
+      this.getSystemFonts()
       this.getMediaDevice()
       this.current_hot_key = window.appHotKeyConfig
       this.initHotKeyConfig()
       this.getHotKeyStatus()
+      this.syncInit()
     },
     // initTOC() {
     //   const list = this.$refs.dom_setting_list.children
@@ -748,8 +850,10 @@ export default {
         if (list.location == null) list.location = 0
         this.setList(list)
       }
+
+      await this.refreshSetting(this.setting, this.settingVersion)
     },
-    exportPlayList(path) {
+    async exportPlayList(path) {
       const data = JSON.parse(JSON.stringify({
         type: 'playList',
         data: [
@@ -758,8 +862,8 @@ export default {
           ...this.userList,
         ],
       }))
-      for (const list of data.data) {
-        for (const item of list.list) {
+      for await (const list of data.data) {
+        for await (const item of list.list) {
           if (item.otherSource) delete item.otherSource
         }
       }
@@ -773,9 +877,6 @@ export default {
         return
       }
       if (allData.type !== 'allData') return
-      const { version: settingVersion, setting } = mergeSetting(allData.setting)
-      setting.isAgreePact = false
-      this.refreshSetting(setting, settingVersion)
 
       // 兼容0.6.2及以前版本的列表数据
       if (allData.defaultList) return this.setList({ id: 'default', list: allData.defaultList.list, name: '试听列表', location: 0 })
@@ -784,6 +885,11 @@ export default {
         if (list.location == null) list.location = 0
         this.setList(list)
       }
+
+      const { version: settingVersion, setting } = mergeSetting(allData.setting)
+      setting.isAgreePact = false
+
+      await this.refreshSetting(setting, settingVersion)
     },
     async exportAllData(path) {
       let allData = JSON.parse(JSON.stringify({
@@ -795,8 +901,8 @@ export default {
           ...this.userList,
         ],
       }))
-      for (const list of allData.playList) {
-        for (const item of list.list) {
+      for await (const list of allData.playList) {
+        for await (const item of list.list) {
           if (item.otherSource) delete item.otherSource
         }
       }
@@ -906,10 +1012,18 @@ export default {
       let info = index == null ? this.windowSizeList[2] : this.windowSizeList[index]
       setWindowSize(info.width, info.height)
     },
-    refreshSetting(setting, version) {
+    async refreshSetting(newSetting, newVersion) {
+      await saveSetting(newSetting)
+      const { setting, version } = await getSetting()
       this.setSetting(setting)
       this.setSettingVersion(version)
       if (setting.windowSizeId != null) this.handleWindowSizeChange(null, setting.windowSizeId)
+      window.globalObj.apiSource = setting.apiSource
+      if (/^user_api/.test(setting.apiSource)) {
+        rendererInvoke(NAMES.mainWindow.set_user_api, setting.apiSource)
+      } else {
+        window.globalObj.qualityList = music.supportQuality[setting.apiSource]
+      }
       for (let key of Object.keys(setting.network.proxy)) {
         window.globalObj.proxy[key] = setting.network.proxy[key]
       }
@@ -961,7 +1075,12 @@ export default {
       await rendererInvoke(NAMES.hotKey.enable, true)
       window.isEditingHotKey = false
       this.isEditHotKey = false
+      const prevInput = hotKeyTargetInput
       hotKeyTargetInput = null
+      if (prevInput.value == this.$t('view.setting.hot_key_tip_input')) {
+        prevInput.value = newHotKey ? this.formatHotKeyName(newHotKey) : ''
+        return
+      }
       let config = this.hotKeyConfig[type][info.name]
       let originKey
       if (newHotKey) {
@@ -1115,6 +1234,49 @@ export default {
       else status = `${this.$t('view.setting.basic_source_status_failed')} - ${window.globalObj.userApi.message}`
 
       return status
+    },
+    setStatus(e, status) {
+      this.sync.status.status = status.status
+      this.sync.status.message = status.message
+      this.sync.status.address = status.address
+      this.sync.status.code = status.code
+      this.sync.status.devices = status.devices
+    },
+    syncInit() {
+      rendererInvoke(NAMES.mainWindow.sync_get_status).then(status => {
+        this.sync.status.status = status.status
+        this.sync.status.message = status.message
+        this.sync.status.address = status.address
+        this.sync.status.code = status.code
+        this.sync.status.devices = status.devices
+      })
+      rendererOn(NAMES.mainWindow.sync_status, this.setStatus)
+    },
+    syncUnInit() {
+      rendererOff(NAMES.mainWindow.sync_status, this.setStatus)
+    },
+    handleSyncChange(action) {
+      switch (action) {
+        case 'port':
+          if (!this.current_setting.sync.enable) return
+        case 'enable':
+          rendererInvoke(NAMES.mainWindow.sync_enable, {
+            enable: this.current_setting.sync.enable,
+            port: this.current_setting.sync.port,
+          })
+          window.globalObj.sync.enable = this.current_setting.sync.enable
+          break
+      }
+    },
+    handleRefreshSyncCode() {
+      rendererInvoke(NAMES.mainWindow.sync_generate_code)
+    },
+    getSystemFonts() {
+      rendererInvoke(NAMES.mainWindow.get_system_fonts).then(fonts => {
+        this.systemFontList = fonts.map(f => ({ id: f, label: f.replace(/(^"|"$)/g, '') }))
+      }).catch(() => {
+        this.systemFontList = []
+      })
     },
   },
 }

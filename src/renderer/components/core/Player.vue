@@ -41,7 +41,8 @@ div(:class="$style.player")
       div(:class="$style.column2")
         div(:class="$style.progress" v-if="!isShowPlayerDetail")
           //- div(:class="[$style.progressBar, $style.progressBar1]" :style="{ transform: `scaleX(${progress || 0})` }")
-          div(:class="[$style.progressBar, $style.progressBar2, isActiveTransition ? $style.barTransition : '']" @transitionend="handleTransitionEnd" :style="{ transform: `scaleX(${progress || 0})`, willChange: isPlay || isActiveTransition ? 'transform' : 'auto' }")
+          div(:class="[$style.progressBar, $style.progressBar2, isActiveTransition ? $style.barTransition : '']"
+            @transitionend="handleTransitionEnd" :style="{ transform: `scaleX(${progress || 0})` }")
         div(:class="$style.progressMask" @click='handleSetProgress' ref="dom_progress")
       div(:class="$style.column3")
         span(:class="$style.statusText") {{statusText}}
@@ -235,6 +236,7 @@ export default {
           break
       }
     })
+    this.registerMediaSessionHandler()
     navigator.mediaDevices.addEventListener('devicechange', this.handleMediaListChange)
     document.addEventListener('mousemove', this.handleVolumeMsMove)
     document.addEventListener('mouseup', this.handleVolumeMsUp)
@@ -254,6 +256,8 @@ export default {
       if (window.restorePlayInfo) {
         this.handleRestorePlay(window.restorePlayInfo)
         window.restorePlayInfo = null
+        navigator.mediaSession.playbackState = 'paused'
+        this.updateMediaSessionInfo()
         return
       }
       // console.log('changePlay')
@@ -264,7 +268,7 @@ export default {
     'setting.player.togglePlayMethod'(n) {
       audio.loop = n === 'singleLoop'
       if (this.playedList.length) this.clearPlayedList()
-      if (n == 'random') this.setPlayedList(this.playMusicInfo)
+      if (n == 'random' && this.playMusicInfo && !this.playMusicInfo.isTempPlay) this.setPlayedList(this.playMusicInfo)
     },
     'setting.player.isMute'(n) {
       audio.muted = n
@@ -272,13 +276,14 @@ export default {
     'setting.player.mediaDeviceId'(n) {
       this.setMediaDevice()
     },
-    'setting.player.isShowLyricTransition'() {
+    'setting.player.isShowLyricTranslation'() {
       this.setLyric()
     },
     'setting.player.isPlayLxlrc'() {
       this.setLyric()
     },
     async list(n, o) {
+      if (this.playInfo.isTempPlay) return
       if (n === o && this.musicInfo.songmid) {
         let index = this.listId == 'download'
           ? n.findIndex(s => s.musicInfo.songmid === this.musicInfo.songmid)
@@ -409,7 +414,7 @@ export default {
           this.restorePlayTime = 0
         }
         if (!this.targetSong.interval && this.listId != 'download') {
-          this.updateMusicInfo({ id: this.listId, index: this.playIndex, data: { interval: formatPlayTime2(this.maxPlayTime) }, musicInfo: this.targetSong })
+          this.updateMusicInfo({ listId: this.listId, id: this.targetSong.songmid, musicInfo: this.targetSong, data: { interval: formatPlayTime2(this.maxPlayTime) } })
         }
       })
       audio.addEventListener('loadstart', () => {
@@ -478,10 +483,11 @@ export default {
     },
     async play() {
       this.clearDelayNextTimeout()
+      this.updateMediaSessionInfo()
 
       const targetSong = this.targetSong
 
-      if (this.setting.player.togglePlayMethod == 'random') this.setPlayedList(this.playMusicInfo)
+      if (this.setting.player.togglePlayMethod == 'random' && !this.playMusicInfo.isTempPlay) this.setPlayedList(this.playMusicInfo)
       this.retryNum = 0
       this.restorePlayTime = 0
 
@@ -549,20 +555,28 @@ export default {
       this.handleUpdateWinLyricInfo('play', audio.currentTime * 1000)
       this.setAppTitle()
       this.sendProgressEvent(this.progress, 'normal')
+      navigator.mediaSession.playbackState = 'playing'
     },
     stopPlay() {
       this.isPlay = false
       window.lrc.pause()
       this.handleUpdateWinLyricInfo('pause')
-      this.sendProgressEvent(this.progress, 'paused')
       this.clearAppTitle()
+      this.$nextTick(() => {
+        if (this.playMusicInfo) {
+          this.sendProgressEvent(this.progress, 'paused')
+          navigator.mediaSession.playbackState = 'paused'
+        } else {
+          this.sendProgressEvent(this.progress, 'none')
+          navigator.mediaSession.playbackState = 'none'
+        }
+      })
     },
     handleSetProgress(event) {
-      this.setProgress(event.offsetX / this.pregessWidth)
+      this.setProgress(event.offsetX / this.pregessWidth * this.maxPlayTime)
     },
-    setProgress(pregress) {
+    setProgress(time) {
       if (!audio.src) return
-      const time = pregress * this.maxPlayTime
       if (this.restorePlayTime) this.restorePlayTime = time
       if (this.mediaBuffer.playTime) {
         this.clearBufferTimeout()
@@ -603,37 +617,28 @@ export default {
       if (highQuality && songInfo._types['320k'] && list && list.includes('320k')) type = '320k'
       return type
     },
-    setUrl(targetSong, isRefresh, isRetryed = false, retryedSource = [], originMusic = null) {
-      if (!retryedSource.includes(targetSong.source)) retryedSource.push(targetSong.source)
-
+    setUrl(targetSong, isRefresh, isRetryed = false) {
       let type = this.getPlayType(this.setting.player.highQuality, targetSong)
-      this.musicInfo.url = targetSong.typeUrl[type]
+      // this.musicInfo.url = await getMusicUrl(targetSong, type)
       this.status = this.statusText = this.$t('core.player.geting_url')
 
-      return this.getUrl({ musicInfo: targetSong, originMusic, type, isRefresh }).then(url => {
-        if ((targetSong !== this.targetSong && originMusic !== this.targetSong) || this.isPlay) return
+      return this.getUrl({
+        musicInfo: targetSong,
+        type,
+        isRefresh,
+        onToggleSource: () => {
+          this.status = this.statusText = 'Try toggle source...'
+        },
+      }).then(url => {
+        if (targetSong !== this.targetSong || this.isPlay) return
         audio.src = this.musicInfo.url = url
       }).catch(err => {
         // console.log('err', err.message)
         if (err.message == requestMsg.cancelRequest) return
-        if (!isRetryed) return this.setUrl(targetSong, isRefresh, true, retryedSource, originMusic)
-        if (!originMusic) originMusic = targetSong
-
-        this.status = this.statusText = 'Try toggle source...'
-
-        return this.getOtherSource(originMusic).then(otherSource => {
-          console.log('find otherSource', otherSource)
-          if (otherSource.length) {
-            for (const item of otherSource) {
-              if (retryedSource.includes(item.source) || !this.assertApiSupport(item.source)) continue
-              console.log('try toggle to: ', item.source, item.name, item.singer, item.interval)
-              return this.setUrl(item, isRefresh, false, retryedSource, originMusic)
-            }
-          }
-          this.status = this.statusText = err.message
-          this.addDelayNextTimeout()
-          return Promise.reject(err)
-        })
+        if (!isRetryed) return this.setUrl(targetSong, isRefresh, true)
+        this.status = this.statusText = err.message
+        this.addDelayNextTimeout()
+        return Promise.reject(err)
       })
     },
     setImg(targetSong) {
@@ -641,15 +646,18 @@ export default {
 
       if (!this.musicInfo.img) {
         this.getPic(targetSong).then(() => {
+          if (targetSong.songmid !== this.musicInfo.songmid) return
           this.musicInfo.img = targetSong.img
+          this.updateMediaSessionInfo()
         })
       }
     },
     setLrc(targetSong) {
-      this.getLrc(targetSong).then(() => {
-        this.musicInfo.lrc = targetSong.lrc
-        this.musicInfo.tlrc = targetSong.tlrc
-        this.musicInfo.lxlrc = targetSong.lxlrc
+      this.getLrc(targetSong).then(({ lyric, tlyric, lxlyric }) => {
+        if (targetSong.songmid !== this.musicInfo.songmid) return
+        this.musicInfo.lrc = lyric
+        this.musicInfo.tlrc = tlyric
+        this.musicInfo.lxlrc = lxlyric
       }).catch(() => {
         this.status = this.statusText = this.$t('core.player.lyric_error')
       }).finally(() => {
@@ -841,7 +849,7 @@ export default {
           this.playNext()
           break
         case 'progress':
-          this.setProgress(data)
+          this.handleSetProgress(data)
           break
         case 'volume':
           break
@@ -860,9 +868,9 @@ export default {
     setLyric() {
       window.lrc.setLyric(
         this.setting.player.isPlayLxlrc && this.musicInfo.lxlrc ? this.musicInfo.lxlrc : this.musicInfo.lrc,
-        this.setting.player.isShowLyricTransition && this.musicInfo.tlrc ? this.musicInfo.tlrc : '',
+        this.setting.player.isShowLyricTranslation && this.musicInfo.tlrc ? this.musicInfo.tlrc : '',
         // (
-        //   this.setting.player.isShowLyricTransition && this.musicInfo.tlrc
+        //   this.setting.player.isShowLyricTranslation && this.musicInfo.tlrc
         //     ? (this.musicInfo.tlrc + '\n')
         //     : ''
         // ) + (this.musicInfo.lrc || ''),
@@ -908,6 +916,59 @@ export default {
       })
 
       if (this.setting.player.togglePlayMethod == 'random') this.setPlayedList(this.playMusicInfo)
+    },
+    updateMediaSessionInfo() {
+      const mediaMetadata = {
+        title: this.targetSong.name,
+        artist: this.targetSong.singer,
+        album: this.targetSong.albumName,
+      }
+      if (this.targetSong.img) mediaMetadata.artwork = [{ src: this.targetSong.img }]
+      navigator.mediaSession.metadata = new window.MediaMetadata(mediaMetadata)
+    },
+    registerMediaSessionHandler() {
+      // navigator.mediaSession.setActionHandler('play', () => {
+      //   if (this.isPlay || !this.playMusicInfo) return
+      //   console.log('play')
+      //   this.startPlay()
+      // })
+      // navigator.mediaSession.setActionHandler('pause', () => {
+      //   if (!this.isPlay || !this.playMusicInfo) return
+      //   console.log('pause')
+      //   this.stopPlay()
+      // })
+      navigator.mediaSession.setActionHandler('stop', () => {
+        if (!this.isPlay || !this.playMusicInfo) return
+        console.log('stop')
+        this.stopPlay()
+      })
+      navigator.mediaSession.setActionHandler('seekbackward', details => {
+        if (!this.isPlay || !this.playMusicInfo) return
+        console.log('seekbackward')
+        this.setProgress(Math.max(audio.currentTime - details.seekOffset, 0))
+      })
+      navigator.mediaSession.setActionHandler('seekforward', details => {
+        if (!this.isPlay || !this.playMusicInfo) return
+        console.log('seekforward')
+        this.setProgress(Math.min(audio.currentTime + details.seekOffset, audio.duration))
+      })
+      navigator.mediaSession.setActionHandler('seekto', details => {
+        console.log('seekto', details.seekTime)
+        let time = Math.min(details.seekTime, audio.duration)
+        time = Math.max(time, 0)
+        this.setProgress(time)
+      })
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        console.log('previoustrack')
+        this.playPrev()
+      })
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        console.log('nexttrack')
+        this.playNext()
+      })
+      // navigator.mediaSession.setActionHandler('skipad', () => {
+      //   console.log('')
+      // })
     },
   },
 }
@@ -1057,7 +1118,7 @@ export default {
   height: 100%;
   border-radius: @radius-progress-border;
   transition-duration: 0.2s;
-  background-color: @color-theme;
+  background-color: @color-btn;
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
 }
 
@@ -1075,14 +1136,14 @@ export default {
   margin-left: 5px;
   height: 100%;
   width: 20px;
-  color: @color-theme;
+  color: @color-btn;
   display: flex;
   flex-flow: column nowrap;
   justify-content: center;
   align-items: center;
 
   transition: opacity 0.2s ease;
-  opacity: .5;
+  opacity: .6;
   cursor: pointer;
 
   svg {
@@ -1130,7 +1191,7 @@ export default {
 
 .progress {
   width: 100%;
-  height: 3px;
+  height: 4px;
   // overflow: hidden;
   transition: @transition-theme;
   transition-property: background-color;
@@ -1163,6 +1224,7 @@ export default {
 .progress-bar2 {
   background-color: @color-player-progress-bar2;
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  opacity: 0.8;
 }
 
 .bar-transition {
@@ -1226,10 +1288,10 @@ each(@themes, {
       // }
     }
     .titleBtn {
-      color: ~'@{color-@{value}-theme}';
+      color: ~'@{color-@{value}-btn}';
     }
     .play-btn {
-      color: ~'@{color-@{value}-theme}';
+      color: ~'@{color-@{value}-btn}';
       svg {
         filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.3));
       }
@@ -1239,7 +1301,7 @@ each(@themes, {
     }
 
     .volume-bar {
-      background-color: ~'@{color-@{value}-theme}';
+      background-color: ~'@{color-@{value}-btn}';
     }
 
 

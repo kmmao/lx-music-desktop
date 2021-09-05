@@ -2,7 +2,7 @@ const path = require('path')
 const os = require('os')
 
 const defaultSetting = {
-  version: '1.0.40',
+  version: '1.0.45',
   player: {
     togglePlayMethod: 'listLoop',
     highQuality: false,
@@ -11,7 +11,7 @@ const defaultSetting = {
     isMute: false,
     mediaDeviceId: 'default',
     isMediaDeviceRemovedStopPlay: false,
-    isShowLyricTransition: false,
+    isShowLyricTranslation: false,
     isPlayLxlrc: true,
     isSavePlayTime: false,
   },
@@ -26,6 +26,7 @@ const defaultSetting = {
     theme: 0,
     isLockScreen: true,
     style: {
+      font: '',
       fontSize: 120,
       opacity: 95,
       isZoomActiveLrc: true,
@@ -36,6 +37,7 @@ const defaultSetting = {
     isShowSource: true,
     prevSelectListId: 'default',
     isSaveScrollLocation: true,
+    addMusicLocationType: 'top',
   },
   download: {
     enable: false,
@@ -43,8 +45,10 @@ const defaultSetting = {
     fileName: '歌名 - 歌手',
     maxDownloadNum: 3,
     isDownloadLrc: false,
+    lrcFormat: 'utf8',
     isEmbedPic: true,
     isEmbedLyric: false,
+    isUseOtherSource: false,
   },
   leaderboard: {
     source: 'kw',
@@ -82,6 +86,10 @@ const defaultSetting = {
     isShow: false,
     isToTray: false,
     themeId: 0,
+  },
+  sync: {
+    enable: false,
+    port: '23332',
   },
   windowSizeId: 2,
   themeId: 0,

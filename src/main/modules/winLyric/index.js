@@ -21,7 +21,7 @@ const setLyricsConfig = debounce(config => {
   // if (y != null) bounds.y = y
   // if (width != null) bounds.width = width
   // if (height != null) bounds.height = height
-  global.lx_event.common.setAppConfig({ desktopLyric: config }, WIN_LYRIC_EVENT_NAME.name)
+  global.lx_core.setAppConfig({ desktopLyric: config }, WIN_LYRIC_EVENT_NAME.name)
 }, 500)
 
 const winEvent = lyricWindow => {
@@ -109,7 +109,7 @@ const createWindow = () => {
     alwaysOnTop: isAlwaysOnTop,
     skipTaskbar: true,
     webPreferences: {
-      // contextIsolation: true,
+      contextIsolation: false,
       webSecurity: !global.isDev,
       nodeIntegration: true,
     },

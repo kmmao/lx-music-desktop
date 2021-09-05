@@ -3,6 +3,7 @@ import path from 'path'
 import { shell, clipboard } from 'electron'
 import crypto from 'crypto'
 import { rendererSend, rendererInvoke, NAMES } from '../../common/ipc'
+import iconv from 'iconv-lite'
 
 /**
  * 获取两个数之间的随机整数，大于等于min，小于max
@@ -80,7 +81,7 @@ const encodeNames = {
   '&apos;': "'",
   '&#039;': "'",
 }
-export const decodeName = (str = '') => str.replace(/(?:&amp;|&lt;|&gt;|&quot;|&apos;|&#039;)/gm, s => encodeNames[s])
+export const decodeName = (str = '') => str?.replace(/(?:&amp;|&lt;|&gt;|&quot;|&apos;|&#039;)/gm, s => encodeNames[s]) || ''
 
 const easeInOutQuad = (t, b, c, d) => {
   t /= d / 2
@@ -276,11 +277,22 @@ export const setMeta = (filePath, meta) => {
  * 保存歌词文件
  * @param {*} filePath
  * @param {*} lrc
+ * @param {*} format
  */
-export const saveLrc = (filePath, lrc) => {
-  fs.writeFile(filePath, lrc, 'utf8', err => {
-    if (err) console.log(err)
-  })
+export const saveLrc = (filePath, lrc, format) => {
+  switch (format) {
+    case 'gbk':
+      fs.writeFile(filePath, iconv.encode(lrc, 'gbk', { addBOM: true }), err => {
+        if (err) console.log(err)
+      })
+      break
+    case 'utf8':
+    default:
+      fs.writeFile(filePath, lrc, 'utf8', err => {
+        if (err) console.log(err)
+      })
+      break
+  }
 }
 
 /**
@@ -371,7 +383,7 @@ export const clearCache = () => rendererInvoke(NAMES.mainWindow.clear_cache)
 export const setWindowSize = (width, height) => rendererSend(NAMES.mainWindow.set_window_size, { width, height })
 
 
-export const getProxyInfo = () => window.globalObj.proxy.enable
+export const getProxyInfo = () => window.globalObj.proxy.enable && window.globalObj.proxy.host
   ? `http://${window.globalObj.proxy.username}:${window.globalObj.proxy.password}@${window.globalObj.proxy.host}:${window.globalObj.proxy.port};`
   : undefined
 
@@ -379,7 +391,7 @@ export const getProxyInfo = () => window.globalObj.proxy.enable
 export const assertApiSupport = source => window.globalObj.qualityList[source] != undefined
 
 export const getSetting = () => rendererInvoke(NAMES.mainWindow.get_setting)
-export const saveSetting = () => rendererInvoke(NAMES.mainWindow.set_app_setting)
+export const saveSetting = setting => rendererInvoke(NAMES.mainWindow.set_app_setting, setting)
 
 export const getPlayList = () => rendererInvoke(NAMES.mainWindow.get_playlist).catch(error => {
   rendererInvoke(NAMES.mainWindow.get_data_path).then(dataPath => {
@@ -407,3 +419,17 @@ export const parseUrlParams = str => {
   }
   return params
 }
+
+export const getLyric = musicInfo => rendererInvoke(NAMES.mainWindow.get_lyric, `${musicInfo.source}_${musicInfo.songmid}`)
+export const setLyric = (musicInfo, { lyric, tlyric, lxlyric }) => rendererSend(NAMES.mainWindow.save_lyric, {
+  id: `${musicInfo.source}_${musicInfo.songmid}`,
+  lyrics: { lyric, tlyric, lxlyric },
+})
+export const clearLyric = () => rendererSend(NAMES.mainWindow.clear_lyric)
+
+export const getMusicUrl = (musicInfo, type) => rendererInvoke(NAMES.mainWindow.get_music_url, `${musicInfo.source}_${musicInfo.songmid}_${type}`)
+export const setMusicUrl = (musicInfo, type, url) => rendererSend(NAMES.mainWindow.save_music_url, {
+  id: `${musicInfo.source}_${musicInfo.songmid}_${type}`,
+  url,
+})
+export const clearMusicUrl = () => rendererSend(NAMES.mainWindow.clear_music_url)

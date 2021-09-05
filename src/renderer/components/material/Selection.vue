@@ -45,8 +45,8 @@ export default {
   },
   computed: {
     label() {
-      if (!this.value) return ''
-      if (!this.itemName) return this.value
+      if (this.value == null) return ''
+      if (this.itemName == null) return this.value
       const item = this.list.find(l => l[this.itemKey] == this.value)
       if (!item) return ''
       return item[this.itemName]
@@ -155,7 +155,7 @@ export default {
   background-color: @color-theme_2-background_2;
   opacity: 0;
   transform: scaleY(0) translateY(0);
-  transform-origin: 0 @selection-height / 2 0;
+  transform-origin: 0 (@selection-height / 2) 0;
   transition: .25s ease;
   transition-property: transform, opacity;
   z-index: 10;

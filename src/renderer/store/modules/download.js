@@ -3,11 +3,20 @@ import fs from 'fs'
 import path from 'path'
 import music from '../../utils/music'
 import { getMusicType } from '../../utils/music/utils'
-import { setMeta, saveLrc } from '../../utils'
+import {
+  setMeta,
+  saveLrc,
+  getLyric as getLyricFromStorage,
+  setLyric,
+  getMusicUrl as getMusicUrlFormStorage,
+  setMusicUrl,
+  assertApiSupport,
+} from '../../utils'
 
+window.downloadList = []
 // state
 const state = {
-  list: [],
+  list: window.downloadList,
   waitingList: [],
   downloadStatus: {
     RUN: 'run',
@@ -147,15 +156,96 @@ const pauseTasks = async(store, list, runs = []) => {
   await pauseTasks(store, list, runs)
 }
 
-const getUrl = (downloadInfo, isRefresh) => {
-  const url = downloadInfo.musicInfo.typeUrl[downloadInfo.type]
+const handleGetMusicUrl = function(musicInfo, type, retryedSource = [], originMusic) {
+  // console.log(musicInfo.source)
+  if (!originMusic) originMusic = musicInfo
+  let reqPromise
+  try {
+    reqPromise = music[musicInfo.source].getMusicUrl(musicInfo, type).promise
+  } catch (err) {
+    reqPromise = Promise.reject(err)
+  }
+  return reqPromise.catch(err => {
+    if (!retryedSource.includes(musicInfo.source)) retryedSource.push(musicInfo.source)
+    return this.dispatch('list/getOtherSource', originMusic).then(otherSource => {
+      console.log('find otherSource', otherSource)
+      if (otherSource.length) {
+        for (const item of otherSource) {
+          if (retryedSource.includes(item.source) || !assertApiSupport(item.source)) continue
+          console.log('try toggle to: ', item.source, item.name, item.singer, item.interval)
+          return handleGetMusicUrl.call(this, item, type, retryedSource, originMusic)
+        }
+      }
+      return Promise.reject(err)
+    })
+  })
+}
+
+const getMusicUrl = async function(downloadInfo, isUseOtherSource, isRefresh) {
+  const cachedUrl = await getMusicUrlFormStorage(downloadInfo.musicInfo, downloadInfo.type)
   if (!downloadInfo.musicInfo._types[downloadInfo.type]) {
     // 兼容旧版酷我源搜索列表过滤128k音质的bug
-    if (!(downloadInfo.musicInfo.source == 'kw' && downloadInfo.type == '128k')) return Promise.reject(new Error('该歌曲没有可下载的音频'))
+    if (!(downloadInfo.musicInfo.source == 'kw' && downloadInfo.type == '128k')) throw new Error('该歌曲没有可下载的音频')
 
     // return Promise.reject(new Error('该歌曲没有可下载的音频'))
   }
-  return url && !isRefresh ? Promise.resolve({ url }) : music[downloadInfo.musicInfo.source].getMusicUrl(downloadInfo.musicInfo, downloadInfo.type).promise
+  return cachedUrl && !isRefresh
+    ? cachedUrl
+    : (
+        isUseOtherSource
+          ? handleGetMusicUrl.call(this, downloadInfo.musicInfo, downloadInfo.type)
+          : music[downloadInfo.musicInfo.source].getMusicUrl(downloadInfo.musicInfo, downloadInfo.type).promise
+      ).then(({ url }) => {
+        setMusicUrl(downloadInfo.musicInfo, downloadInfo.type, url)
+        return url
+      })
+}
+const getPic = function(musicInfo, retryedSource = [], originMusic) {
+  // console.log(musicInfo.source)
+  if (!originMusic) originMusic = musicInfo
+  let reqPromise
+  try {
+    reqPromise = music[musicInfo.source].getPic(musicInfo).promise
+  } catch (err) {
+    reqPromise = Promise.reject(err)
+  }
+  return reqPromise.catch(err => {
+    if (!retryedSource.includes(musicInfo.source)) retryedSource.push(musicInfo.source)
+    return this.dispatch('list/getOtherSource', originMusic).then(otherSource => {
+      console.log('find otherSource', otherSource)
+      if (otherSource.length) {
+        for (const item of otherSource) {
+          if (retryedSource.includes(item.source)) continue
+          console.log('try toggle to: ', item.source, item.name, item.singer, item.interval)
+          return getPic.call(this, item, retryedSource, originMusic)
+        }
+      }
+      return Promise.reject(err)
+    })
+  })
+}
+const getLyric = function(musicInfo, retryedSource = [], originMusic) {
+  if (!originMusic) originMusic = musicInfo
+  let reqPromise
+  try {
+    reqPromise = music[musicInfo.source].getLyric(musicInfo).promise
+  } catch (err) {
+    reqPromise = Promise.reject(err)
+  }
+  return reqPromise.catch(err => {
+    if (!retryedSource.includes(musicInfo.source)) retryedSource.push(musicInfo.source)
+    return this.dispatch('list/getOtherSource', originMusic).then(otherSource => {
+      console.log('find otherSource', otherSource)
+      if (otherSource.length) {
+        for (const item of otherSource) {
+          if (retryedSource.includes(item.source)) continue
+          console.log('try toggle to: ', item.source, item.name, item.singer, item.interval)
+          return getLyric.call(this, item, retryedSource, originMusic)
+        }
+      }
+      return Promise.reject(err)
+    })
+  })
 }
 
 // 修复 1.1.x版本 酷狗源歌词格式
@@ -167,24 +257,37 @@ const fixKgLyric = lrc => /\[00:\d\d:\d\d.\d+\]/.test(lrc) ? lrc.replace(/(?:\[0
  * @param {*} filePath
  * @param {*} isEmbedPic // 是否嵌入图片
  */
-const saveMeta = (downloadInfo, filePath, isEmbedPic, isEmbedLyric) => {
+const saveMeta = function(downloadInfo, filePath, isUseOtherSource, isEmbedPic, isEmbedLyric) {
   if (downloadInfo.type === 'ape') return
   const tasks = [
     isEmbedPic
       ? downloadInfo.musicInfo.img
         ? Promise.resolve(downloadInfo.musicInfo.img)
-        : music[downloadInfo.musicInfo.source].getPic(downloadInfo.musicInfo).promise.catch(err => {
-          console.log(err)
-          return null
-        })
+        : (
+            isUseOtherSource
+              ? getPic.call(this, downloadInfo.musicInfo)
+              : music[downloadInfo.musicInfo.source].getPic(downloadInfo.musicInfo).promise
+          ).catch(err => {
+            console.log(err)
+            return null
+          })
       : Promise.resolve(),
     isEmbedLyric
-      ? downloadInfo.musicInfo.lrc
-        ? Promise.resolve({ lyric: downloadInfo.musicInfo.lrc, tlyric: downloadInfo.musicInfo.tlrc || '' })
-        : music[downloadInfo.musicInfo.source].getLyric(downloadInfo.musicInfo).promise.catch(err => {
-          console.log(err)
-          return null
-        })
+      ? getLyricFromStorage(downloadInfo.musicInfo).then(lrcInfo => {
+        return lrcInfo.lyric
+          ? Promise.resolve({ lyric: lrcInfo.lyric, tlyric: lrcInfo.tlyric || '' })
+          : (
+              isUseOtherSource
+                ? getLyric.call(this, downloadInfo.musicInfo)
+                : music[downloadInfo.musicInfo.source].getLyric(downloadInfo.musicInfo).promise
+            ).then(({ lyric, tlyric, lxlyric }) => {
+              setLyric(downloadInfo.musicInfo, { lyric, tlyric, lxlyric })
+              return { lyric, tlyric, lxlyric }
+            }).catch(err => {
+              console.log(err)
+              return null
+            })
+      })
       : Promise.resolve(),
   ]
   Promise.all(tasks).then(([imgUrl, lyrics = {}]) => {
@@ -204,26 +307,31 @@ const saveMeta = (downloadInfo, filePath, isEmbedPic, isEmbedLyric) => {
  * @param {*} downloadInfo
  * @param {*} filePath
  */
-const downloadLyric = (downloadInfo, filePath) => {
-  const promise = downloadInfo.musicInfo.lrc
-    ? Promise.resolve({ lyric: downloadInfo.musicInfo.lrc, tlyric: downloadInfo.musicInfo.tlrc || '' })
-    : music[downloadInfo.musicInfo.source].getLyric(downloadInfo.musicInfo).promise
+const downloadLyric = (downloadInfo, filePath, lrcFormat) => {
+  const promise = getLyric(downloadInfo.musicInfo).then(lrcInfo => {
+    return lrcInfo.lyric
+      ? Promise.resolve({ lyric: lrcInfo.lyric, tlyric: lrcInfo.tlyric || '' })
+      : music[downloadInfo.musicInfo.source].getLyric(downloadInfo.musicInfo).promise.then(({ lyric, tlyric, lxlyric }) => {
+        setLyric(downloadInfo.musicInfo, { lyric, tlyric, lxlyric })
+        return { lyric, tlyric, lxlyric }
+      })
+  })
   promise.then(lrcs => {
     if (lrcs.lyric) {
       lrcs.lyric = fixKgLyric(lrcs.lyric)
-      saveLrc(filePath.replace(/(mp3|flac|ape|wav)$/, 'lrc'), lrcs.lyric)
+      saveLrc(filePath.replace(/(mp3|flac|ape|wav)$/, 'lrc'), lrcs.lyric, lrcFormat)
     }
   })
 }
 
-const refreshUrl = function(commit, downloadInfo) {
+const refreshUrl = function(commit, downloadInfo, isUseOtherSource) {
   commit('setStatusText', { downloadInfo, text: '链接失效，正在刷新链接' })
-  getUrl(downloadInfo, true).then(result => {
-    commit('updateUrl', { downloadInfo, url: result.url })
+  getMusicUrl.call(this, downloadInfo, isUseOtherSource, true).then(url => {
+    commit('updateUrl', { downloadInfo, url })
     commit('setStatusText', { downloadInfo, text: '链接刷新成功' })
     const dl = dls[downloadInfo.key]
     if (!dl) return
-    dl.refreshUrl(result.url)
+    dl.refreshUrl(url)
     dl.start().catch(err => {
       commit('onError', { downloadInfo, errorMsg: err.message })
       commit('setStatusText', { downloadInfo, text: err.message })
@@ -262,6 +370,7 @@ const actions = {
       status: state.downloadStatus.WAITING,
       statusText: '待下载',
       url: null,
+      // songmid: musicInfo.songmid,
       fileName: `${rootState.setting.download.fileName
         .replace('歌名', musicInfo.name)
         .replace('歌手', musicInfo.singer)}.${ext}`.replace(filterFileName, ''),
@@ -326,8 +435,8 @@ const actions = {
         commit('onCompleted', downloadInfo)
         dispatch('startTask')
 
-        saveMeta(downloadInfo, downloadInfo.filePath, rootState.setting.download.isEmbedPic, rootState.setting.download.isEmbedLyric)
-        if (rootState.setting.download.isDownloadLrc) downloadLyric(downloadInfo, downloadInfo.filePath)
+        saveMeta.call(_this, downloadInfo, downloadInfo.filePath, rootState.setting.download.isUseOtherSource, rootState.setting.download.isEmbedPic, rootState.setting.download.isEmbedLyric)
+        if (rootState.setting.download.isDownloadLrc) downloadLyric(downloadInfo, downloadInfo.filePath, rootState.setting.download.lrcFormat)
         console.log('on complate')
       },
       onError(err) {
@@ -343,7 +452,8 @@ const actions = {
           return
         }
         if (err.code == 'ENOTFOUND') {
-          refreshUrl.call(_this, commit, downloadInfo)
+          commit('onError', { downloadInfo, errorMsg: '链接失效' })
+          refreshUrl.call(_this, commit, downloadInfo, rootState.setting.download.isUseOtherSource)
         } else {
           console.log('Download failed, Attempting Retry')
           dls[downloadInfo.key].start()
@@ -352,7 +462,7 @@ const actions = {
       },
       onFail(response) {
         if (++tryNum[downloadInfo.key] > 2) {
-          commit('onError', downloadInfo)
+          commit('onError', { downloadInfo, errorMsg: '下载失败' })
           dispatch('startTask')
           return
         }
@@ -360,7 +470,13 @@ const actions = {
           case 401:
           case 403:
           case 410:
-            refreshUrl.call(_this, commit, downloadInfo)
+            commit('onError', { downloadInfo, errorMsg: '链接失效' })
+            refreshUrl.call(_this, commit, downloadInfo, rootState.setting.download.isUseOtherSource)
+            break
+          default:
+            dls[downloadInfo.key].start()
+            commit('setStatusText', { downloadInfo, text: '正在重试' })
+            break
         }
       },
       onStart() {
@@ -379,10 +495,10 @@ const actions = {
     commit('setStatusText', { downloadInfo, text: '获取URL中...' })
     let p = options.url
       ? Promise.resolve()
-      : getUrl(downloadInfo).then(result => {
-        commit('updateUrl', { downloadInfo, url: result.url })
-        if (!result.url) return Promise.reject(new Error('获取URL失败'))
-        options.url = result.url
+      : getMusicUrl.call(this, downloadInfo, rootState.setting.download.isUseOtherSource).then(url => {
+        commit('updateUrl', { downloadInfo, url })
+        if (!url) return Promise.reject(new Error('获取URL失败'))
+        options.url = url
       })
     p.then(() => {
       tryNum[downloadInfo.key] = 0
@@ -553,7 +669,7 @@ const mutations = {
     downloadInfo.order = order
   },
   updateDownloadList(state, list) {
-    state.list = list
+    state.list = window.downloadList = list
   },
   updateUrl(state, { downloadInfo, url }) {
     downloadInfo.url = url

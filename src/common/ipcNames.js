@@ -22,6 +22,7 @@ const names = {
     set_app_setting: 'set_app_setting',
     set_window_size: 'set_window_size',
     show_save_dialog: 'show_save_dialog',
+    get_system_fonts: 'get_system_fonts',
 
     handle_request: 'handle_request',
     cancel_request: 'cancel_request',
@@ -59,6 +60,20 @@ const names = {
     request_user_api_cancel: 'request_user_api_cancel',
     get_user_api_status: 'get_user_api_status',
     user_api_status: 'user_api_status',
+
+    get_lyric: 'get_lyric',
+    save_lyric: 'save_lyric',
+    clear_lyric: 'clear_lyric',
+    get_music_url: 'get_music_url',
+    save_music_url: 'save_music_url',
+    clear_music_url: 'clear_music_url',
+
+    sync_enable: 'sync_enable',
+    sync_status: 'sync_status',
+    sync_get_status: 'sync_get_status',
+    sync_generate_code: 'sync_generate_code',
+    sync_action_list: 'sync_action_list',
+    sync_list: 'sync_list',
   },
   winLyric: {
     close: 'close',
