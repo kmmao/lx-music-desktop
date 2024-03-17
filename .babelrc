@@ -1,20 +1,21 @@
 {
   "presets": [
+    "@babel/preset-typescript",
     [
       "@babel/preset-env",
       {
         "corejs": "3",
         "useBuiltIns": "usage"
       }
-    ],
-    [
-      "minify",
-      {
-        "builtIns": false,
-        "evaluate": false,
-        "mangle": false
-      }
     ]
+    // [
+    //   "minify",
+    //   {
+    //     "builtIns": false,
+    //     "evaluate": false,
+    //     "mangle": false
+    //   }
+    // ]
   ],
   "plugins": [
     "@babel/plugin-syntax-dynamic-import",

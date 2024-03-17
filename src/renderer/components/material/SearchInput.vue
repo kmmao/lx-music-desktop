@@ -1,34 +1,58 @@
-<template lang="pug">
-div(:class="$style.container")
-  div(:class="[$style.search, focus ? $style.active : '', big ? $style.big : '', small ? $style.small : '']")
-    div(:class="$style.form")
-      input(:placeholder="placeholder" v-model.trim="text" ref="dom_input"
-            @focus="handleFocus" @blur="handleBlur" @input="$emit('input', text)"
-            @change="sendEvent('change')"
-            @keyup.enter="handleSearch"
-            @keyup.40.prevent="handleKeyDown"
-            @keyup.38.prevent="handleKeyUp"
-            @contextmenu="handleContextMenu")
-      transition(enter-active-class="animated zoomIn" leave-active-class="animated zoomOut")
-        button(type="button" @click="handleClearList" v-show="text")
-          svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/1999/xlink' height='100%' viewBox='0 0 24 24' space='preserve')
-            use(xlink:href='#icon-window-close')
-      button(type="button" @click="handleSearch")
-        slot
-          svg(version='1.1' xmlns='http://www.w3.org/2000/svg' xlink='http://www.w3.org/1999/xlink' height='100%' viewBox='0 0 30.239 30.239' space='preserve')
-            use(xlink:href='#icon-search')
-    //- transition(name="custom-classes-transition"
-    //-             enter-active-class="animated flipInX"
-    //-             leave-active-class="animated flipOutX")
-    div(v-if="list" :class="$style.list" :style="listStyle")
-      ul(ref="dom_list")
-        li(v-for="(item, index) in list" :key="item" :class="selectIndex === index ? $style.select : null" @mouseenter="selectIndex = index" @click="handleTemplistClick(index)")
-          span {{item}}
+<template>
+  <div :class="$style.container">
+    <div :class="[$style.search, {[$style.active]: focus}, {[$style.big]: big}, {[$style.small]: small}]">
+      <div :class="$style.form">
+        <input
+          ref="dom_input"
+          v-model.trim="text"
+          :placeholder="placeholder"
+          @focus="handleFocus"
+          @blur="handleBlur"
+          @input="$emit('update:modelValue', text)"
+          @change="sendEvent('change')"
+          @keyup.enter="handleSearch"
+          @keydown.arrow-down.arrow-up.prevent
+          @keyup.arrow-down.prevent="handleKeyDown"
+          @keyup.arrow-up.prevent="handleKeyUp"
+          @contextmenu="handleContextMenu"
+        >
+        <transition enter-active-class="animated zoomIn" leave-active-class="animated zoomOut">
+          <button v-show="text" type="button" @click="handleClearList">
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 24 24" space="preserve">
+              <use xlink:href="#icon-window-close" />
+            </svg>
+          </button>
+        </transition>
+        <button type="button" @click="handleSearch">
+          <slot>
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="100%" viewBox="0 0 30.239 30.239" space="preserve">
+              <use xlink:href="#icon-search" />
+            </svg>
+          </slot>
+        </button>
+      </div>
+      <div v-if="list" :class="$style.list" :style="listStyle">
+        <ul ref="dom_list" @mouseleave="selectIndex = -1">
+          <li
+            v-for="(item, index) in list"
+            :key="item"
+            :class="{[$style.select]: selectIndex === index }"
+            @mouseenter="selectIndex = index"
+            @click="handleTemplistClick(index)"
+          >
+            <span>{{ item }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
-import { clipboardReadText } from '../../utils'
-import { common as eventCommonNames } from '../../../common/hotKey'
+import { clipboardReadText } from '@common/utils/electron'
+import { HOTKEY_COMMON } from '@common/hotKey'
+import { appSetting } from '@renderer/store/setting'
+
 export default {
   props: {
     placeholder: {
@@ -37,12 +61,15 @@ export default {
     },
     list: {
       type: Array,
+      default() {
+        return []
+      },
     },
     visibleList: {
       type: Boolean,
       default: false,
     },
-    value: {
+    modelValue: {
       type: String,
       default: '',
     },
@@ -55,6 +82,7 @@ export default {
       default: false,
     },
   },
+  emits: ['update:modelValue', 'event'],
   data() {
     return {
       isShow: false,
@@ -74,7 +102,7 @@ export default {
         this.listStyle.height = this.$refs.dom_list.scrollHeight + 'px'
       })
     },
-    value(n) {
+    modelValue(n) {
       this.text = n
     },
     visibleList(n) {
@@ -82,17 +110,18 @@ export default {
     },
   },
   mounted() {
-    if (this.$store.getters.setting.search.isFocusSearchBox) this.handleFocusInput()
+    if (appSetting['search.isFocusSearchBox']) this.handleFocusInput()
     this.handleRegisterEvent('on')
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.handleRegisterEvent('off')
   },
   methods: {
     handleRegisterEvent(action) {
-      let eventHub = window.eventHub
-      let name = action == 'on' ? '$on' : '$off'
-      eventHub[name](eventCommonNames.focusSearchInput.action, this.handleFocusInput)
+      let eventHub = window.key_event
+      let name = action == 'on' ? 'on' : 'off'
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      eventHub[name](HOTKEY_COMMON.focusSearchInput.action, this.handleFocusInput)
     },
     handleFocusInput() {
       this.$refs.dom_input.focus()
@@ -113,7 +142,10 @@ export default {
     },
     handleSearch() {
       this.hideList()
-      if (this.selectIndex < 0) return this.sendEvent('submit')
+      if (this.selectIndex < 0) {
+        this.sendEvent('submit')
+        return
+      }
       this.sendEvent('listClick', this.selectIndex)
     },
     showList() {
@@ -134,10 +166,18 @@ export default {
       })
     },
     handleKeyDown() {
-      this.selectIndex = this.selectIndex + 1 < this.list.length ? this.selectIndex + 1 : 0
+      if (this.list.length) {
+        this.selectIndex = this.selectIndex + 1 < this.list.length ? this.selectIndex + 1 : 0
+      } else if (this.selectIndex > -1) {
+        this.selectIndex = -1
+      }
     },
     handleKeyUp() {
-      this.selectIndex = this.selectIndex - 1 < -1 ? this.list.length - 1 : this.selectIndex - 1
+      if (this.list.length) {
+        this.selectIndex = this.selectIndex - 1 < -1 ? this.list.length - 1 : this.selectIndex - 1
+      } else if (this.selectIndex > -1) {
+        this.selectIndex = -1
+      }
     },
     handleContextMenu() {
       let str = clipboardReadText()
@@ -145,12 +185,12 @@ export default {
       str = str.replace(/\t|\r\n|\n|\r/g, ' ')
       str = str.replace(/\s+/g, ' ')
       let dom_input = this.$refs.dom_input
-      this.text = `${this.text.substring(0, dom_input.selectionStart)}${str}${this.text.substring(dom_input.selectionEnd, this.text.length)}`
-      this.$emit('input', this.text)
+      this.text = this.text.substring(0, dom_input.selectionStart) + str + this.text.substring(dom_input.selectionEnd, this.text.length)
+      this.$emit('update:modelValue', this.text)
     },
     handleClearList() {
       this.text = ''
-      this.$emit('input', this.text)
+      this.$emit('update:modelValue', this.text)
       this.sendEvent('submit')
     },
   },
@@ -159,7 +199,7 @@ export default {
 
 
 <style lang="less" module>
-@import '../../assets/styles/layout.less';
+@import '@renderer/assets/styles/layout.less';
 
 .container {
   position: relative;
@@ -172,12 +212,13 @@ export default {
   position: absolute;
   width: 100%;
   border-radius: @form-radius;
-  transition: box-shadow .4s ease, background-color @transition-theme;
+  transition: box-shadow .4s ease, background-color @transition-normal;
   display: flex;
   flex-flow: column nowrap;
-  background-color: @color-search-form-background;
+  background-color: var(--color-primary-light-300-alpha-700);
 
   &.active {
+    background-color: var(--color-primary-light-600-alpha-100);
     box-shadow: 0 1px 5px 0 rgba(0,0,0,.2);
     .form {
       input {
@@ -199,8 +240,8 @@ export default {
       border-top-left-radius: 3px;
       border-bottom-left-radius: 3px;
       background-color: transparent;
-      // border-bottom: 2px solid @color-theme;
-      // border-color: @color-theme;
+      // border-bottom: 2px solid var(--color-primary);
+      // border-color: var(--color-primary);
       border: none;
 
       outline: none;
@@ -210,7 +251,8 @@ export default {
       font-size: 13.5px;
       line-height: @height-toolbar * 0.52 + 5px;
       &::placeholder {
-        color: @color-btn;
+        color: var(--color-button-font);
+        font-size: .98em;
       }
     }
     button {
@@ -222,7 +264,7 @@ export default {
       cursor: pointer;
       height: 100%;
       padding: 6px 7px;
-      color: @color-btn;
+      color: var(--color-button-font);
       transition: background-color .2s ease;
 
       &:last-child {
@@ -231,10 +273,10 @@ export default {
       }
 
       &:hover {
-        background-color: @color-theme-hover;
+        background-color: var(--color-button-background-hover);
       }
       &:active {
-        background-color: @color-theme-active;
+        background-color: var(--color-button-background-active);
       }
     }
   }
@@ -255,7 +297,7 @@ export default {
       }
 
       &.select {
-        background-color: @color-search-list-hover;
+        background-color: var(--color-primary-dark-100-alpha-700);
       }
       &:last-child {
         border-bottom-left-radius: 3px;
@@ -278,41 +320,5 @@ export default {
   }
 }
 
-each(@themes, {
-  :global(#container.@{value}) {
-
-    .search {
-      background-color: ~'@{color-@{value}-search-form-background}';
-      &.active {
-        box-shadow: 0 1px 5px 0 rgba(0,0,0,.2);
-      }
-
-      .form {
-        input {
-          &::placeholder {
-            color: ~'@{color-@{value}-btn}';
-          }
-        }
-        button {
-          color: ~'@{color-@{value}-btn}';
-
-          &:hover {
-            background-color: ~'@{color-@{value}-theme-hover}';
-          }
-          &:active {
-            background-color: ~'@{color-@{value}-theme-active}';
-          }
-        }
-      }
-      .list {
-        li {
-          &.select {
-            background-color: ~'@{color-@{value}-search-list-hover}';
-          }
-        }
-      }
-    }
-  }
-})
 
 </style>

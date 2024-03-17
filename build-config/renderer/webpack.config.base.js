@@ -1,8 +1,8 @@
 const path = require('path')
-const VueLoaderPlugin = require('vue-loader/lib/plugin')
+const { VueLoaderPlugin } = require('vue-loader')
 const HTMLPlugin = require('html-webpack-plugin')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
-const CleanCSSPlugin = require('less-plugin-clean-css')
+const ESLintPlugin = require('eslint-webpack-plugin')
 
 const vueLoaderConfig = require('../vue-loader.config')
 const { mergeCSSLoader } = require('../utils')
@@ -12,37 +12,44 @@ const isDev = process.env.NODE_ENV === 'development'
 module.exports = {
   target: 'electron-renderer',
   entry: {
-    renderer: path.join(__dirname, '../../src/renderer/main.js'),
+    renderer: path.join(__dirname, '../../src/renderer/main.ts'),
   },
   output: {
     filename: '[name].js',
-    libraryTarget: 'commonjs2',
-    path: path.join(__dirname, '../../dist/electron'),
-    publicPath: 'auto',
+    library: {
+      type: 'commonjs2',
+    },
+    path: path.join(__dirname, '../../dist'),
+    publicPath: '',
   },
   resolve: {
     alias: {
+      '@root': path.join(__dirname, '../../src'),
       '@main': path.join(__dirname, '../../src/main'),
       '@renderer': path.join(__dirname, '../../src/renderer'),
       '@lyric': path.join(__dirname, '../../src/renderer-lyric'),
       '@static': path.join(__dirname, '../../src/static'),
       '@common': path.join(__dirname, '../../src/common'),
     },
-    extensions: ['*', '.js', '.json', '.vue', '.node'],
+    extensions: ['.tsx', '.ts', '.js', '.json', '.node'],
   },
   module: {
     rules: [
       {
-        test: /\.(vue|js)$/,
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
         use: {
-          loader: 'eslint-loader',
+          loader: 'ts-loader',
           options: {
-            formatter: require('eslint-formatter-friendly'),
-            emitWarning: isDev,
+            appendTsSuffixTo: [/\.vue$/],
           },
         },
-        exclude: /node_modules/,
-        enforce: 'pre',
+        parser: {
+          worker: [
+            '*audioContext.audioWorklet.addModule()',
+            '...',
+          ],
+        },
       },
       {
         test: /\.node$/,
@@ -54,9 +61,8 @@ module.exports = {
         options: vueLoaderConfig,
       },
       {
-        test: /\.js$/,
-        loader: 'babel-loader',
-        exclude: /node_modules/,
+        test: /\.pug$/,
+        loader: 'pug-plain-loader',
       },
       {
         test: /\.css$/,
@@ -68,30 +74,12 @@ module.exports = {
           loader: 'less-loader',
           options: {
             sourceMap: true,
-            lessOptions: {
-              plugins: [
-                new CleanCSSPlugin({ advanced: true }),
-              ],
-            },
           },
         }),
       },
       {
-        test: /\.pug$/,
-        oneOf: [
-          // Use pug-plain-loader handle .vue file
-          {
-            resourceQuery: /vue/,
-            use: ['pug-plain-loader'],
-          },
-          // Use pug-loader handle .pug file
-          {
-            use: ['pug-loader'],
-          },
-        ],
-      },
-      {
         test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,
+        exclude: path.join(__dirname, '../../src/renderer/assets/svgs'),
         type: 'asset',
         parser: {
           dataUrlCondition: {
@@ -103,7 +91,21 @@ module.exports = {
         },
       },
       {
-        test: /\.(mp4|webm|ogg|mp3|wav|flac|aac)(\?.*)?$/,
+        test: /\.svg$/,
+        include: path.join(__dirname, '../../src/renderer/assets/svgs'),
+        use: [
+          {
+            loader: 'svg-sprite-loader',
+            options: {
+              symbolId: 'icon-[name]',
+            },
+          },
+          'svg-transform-loader',
+          'svgo-loader',
+        ],
+      },
+      {
+        test: /\.(mp4|webm|ogg|mp3|wav|flac|aac)$/,
         type: 'asset',
         parser: {
           dataUrlCondition: {
@@ -128,16 +130,12 @@ module.exports = {
       },
     ],
   },
-  performance: {
-    maxEntrypointSize: 300000,
-  },
   plugins: [
     new HTMLPlugin({
       filename: 'index.html',
-      template: path.join(__dirname, '../../src/renderer/index.pug'),
+      template: path.join(__dirname, '../../src/renderer/index.html'),
       isProd: process.env.NODE_ENV == 'production',
       browser: process.browser,
-      scriptLoading: 'blocking',
       __dirname,
     }),
     new VueLoaderPlugin(),
@@ -146,6 +144,10 @@ module.exports = {
       // both options are optional
       filename: isDev ? '[name].css' : '[name].[contenthash:8].css',
       chunkFilename: isDev ? '[id].css' : '[id].[contenthash:8].css',
+    }),
+    new ESLintPlugin({
+      extensions: ['js', 'vue'],
+      formatter: require('eslint-formatter-friendly'),
     }),
   ],
 }

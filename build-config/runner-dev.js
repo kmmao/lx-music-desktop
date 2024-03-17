@@ -13,6 +13,9 @@ const webpackHotMiddleware = require('webpack-hot-middleware')
 const mainConfig = require('./main/webpack.config.dev')
 const rendererConfig = require('./renderer/webpack.config.dev')
 const rendererLyricConfig = require('./renderer-lyric/webpack.config.dev')
+const rendererScriptConfig = require('./renderer-scripts/webpack.config.dev')
+const { Arch } = require('electron-builder')
+const replaceLib = require('./build-before-pack')
 
 let electronProcess = null
 let manualRestart = false
@@ -43,27 +46,27 @@ function startRenderer() {
     //   // logStats('Renderer', stats)
     // })
 
-    const server = new WebpackDevServer(
-      compiler,
-      {
-        contentBase: path.join(__dirname, '../'),
-        quiet: true,
-        hot: true,
-        historyApiFallback: true,
-        clientLogLevel: 'warning',
-        overlay: {
-          errors: true,
-        },
-        before(app, ctx) {
-          app.use(hotMiddlewareRenderer)
-          ctx.middleware.waitUntilValid(() => {
-            resolve()
-          })
-        },
+    const server = new WebpackDevServer({
+      port: 9080,
+      hot: true,
+      historyApiFallback: true,
+      static: {
+        directory: path.join(__dirname, '../src/common/theme/images'),
+        publicPath: '/theme_images',
       },
-    )
+      client: {
+        logging: 'warn',
+        overlay: true,
+      },
+      setupMiddlewares(middlewares, devServer) {
+        devServer.app.use(hotMiddlewareRenderer)
+        devServer.middleware.waitUntilValid(resolve)
 
-    server.listen(9080)
+        return middlewares
+      },
+    }, compiler)
+
+    server.start()
   })
 }
 
@@ -90,27 +93,41 @@ function startRendererLyric() {
     //   // logStats('Renderer', stats)
     // })
 
-    const server = new WebpackDevServer(
-      compiler,
-      {
-        contentBase: path.join(__dirname, '../'),
-        quiet: true,
-        hot: true,
-        historyApiFallback: true,
-        clientLogLevel: 'warning',
-        overlay: {
-          errors: true,
-        },
-        before(app, ctx) {
-          app.use(hotMiddlewareRendererLyric)
-          ctx.middleware.waitUntilValid(() => {
-            resolve()
-          })
-        },
+    const server = new WebpackDevServer({
+      port: 9081,
+      hot: true,
+      historyApiFallback: true,
+      // static: {
+      //   directory: path.join(__dirname, '../'),
+      // },
+      client: {
+        logging: 'warn',
+        overlay: true,
       },
-    )
+      setupMiddlewares(middlewares, devServer) {
+        devServer.app.use(hotMiddlewareRenderer)
+        devServer.middleware.waitUntilValid(resolve)
+        return middlewares
+      },
+    }, compiler)
 
-    server.listen(9081)
+    server.start()
+  })
+}
+
+function startRendererScripts() {
+  return new Promise((resolve, reject) => {
+    // mainConfig.entry.main = [path.join(__dirname, '../src/main/index.dev.js')].concat(mainConfig.entry.main)
+    // mainConfig.mode = 'development'
+    const compiler = webpack(rendererScriptConfig)
+
+    compiler.watch({}, (err, stats) => {
+      if (err) {
+        console.log(err)
+        return
+      }
+      resolve()
+    })
   })
 }
 
@@ -154,7 +171,7 @@ function startElectron() {
   let args = [
     '--inspect=5858',
     // 'NODE_ENV=development',
-    path.join(__dirname, '../dist/electron/main.js'),
+    path.join(__dirname, '../dist/main.js'),
   ]
 
   // detect yarn or npm and process commandline args accordingly
@@ -178,11 +195,19 @@ function startElectron() {
   })
 }
 
+const logs = [
+  'Manifest version 2 is deprecated, and support will be removed in 2023',
+  '"Extension server error: Operation failed: Permission denied", source: devtools://devtools/bundled',
+
+  // https://github.com/electron/electron/issues/32133
+  '"Electron sandbox_bundle.js script failed to run"',
+  '"TypeError: object null is not iterable (cannot read property Symbol(Symbol.iterator))",',
+]
 function electronLog(data, color) {
   let log = data.toString()
   if (/[0-9A-z]+/.test(log)) {
-    // 抑制 user api 窗口使用 data url 加载页面时 vue扩展 的报错日志刷屏的问题
-    if (color == 'red' && typeof log === 'string' && log.includes('"Extension server error: Operation failed: Permission denied", source: devtools://devtools/bundled/extensions/extensions.js')) return
+    // 抑制某些无关的报错日志
+    if (color == 'red' && typeof log === 'string' && logs.some(l => log.includes(l))) return
 
     console.log(chalk[color](log))
   }
@@ -194,16 +219,28 @@ function init() {
   spinners.add('main', { text: 'main compiling' })
   spinners.add('renderer', { text: 'renderer compiling' })
   spinners.add('renderer-lyric', { text: 'renderer-lyric compiling' })
+  spinners.add('renderer-scripts', { text: 'renderer-scripts compiling' })
   function handleSuccess(name) {
     spinners.succeed(name, { text: name + ' compile success!' })
   }
   function handleFail(name) {
     spinners.fail(name, { text: name + ' compile fail!' })
   }
+  replaceLib({ electronPlatformName: process.platform, arch: Arch[process.arch] })
 
   Promise.all([
-    startRenderer().then(() => handleSuccess('renderer')).catch(() => handleFail('renderer')),
-    startRendererLyric().then(() => handleSuccess('renderer-lyric')).catch(() => handleFail('renderer-lyric')),
+    startRenderer().then(() => handleSuccess('renderer')).catch((err) => {
+      console.error(err.message)
+      return handleFail('renderer')
+    }),
+    startRendererLyric().then(() => handleSuccess('renderer-lyric')).catch((err) => {
+      console.error(err.message)
+      return handleFail('renderer-lyric')
+    }),
+    startRendererScripts().then(() => handleSuccess('renderer-scripts')).catch((err) => {
+      console.error(err.message)
+      return handleFail('renderer-scripts')
+    }),
     startMain().then(() => handleSuccess('main')).catch(() => handleFail('main')),
   ]).then(startElectron).catch(err => {
     console.error(err)
